@@ -14,6 +14,7 @@ from rust_sounds.audio import (
 )
 from rust_sounds.locator import RustNotFoundError, find_bundles_dir, find_rust_install
 from rust_sounds.pipeline import run_extraction
+from rust_sounds.prefabs import CARBON_PREFABS_URL, extract_prefab_paths, fetch_prefabs
 
 
 def _rss_mb() -> int:
@@ -32,113 +33,151 @@ def _log(msg: str) -> None:
     print(f"[{_rss_mb():>5}MB] {msg}", flush=True)
 
 
-def _walk_bundles_via_unitypy(
+def _walk_via_prefab_list(
     bundles_dir: Path,
     *,
-    bundle_glob: str = "audio*.bundle",
-    max_bundle_mb: float | None = None,
+    prefabs_url: str,
+    prefabs_cache: Path | None,
     rss_abort_mb: int = 4096,
 ) -> Iterator[Any]:
-    """Yield one PrefabView-shaped object per AudioClip with an `assets/...` container.
+    """Yield one PrefabView per Carbon-listed prefab that we can pair with an
+    AudioClip in `audio.bundle` by name-stem.
 
-    Why we walk AudioClips instead of GameObjects: in current Rust bundles, the
-    effect-prefab GameObjects (`assets/prefabs/.../foo.prefab`) live in `content.bundle`,
-    which is too large to load on consumer hardware (4 GB on disk → ~15 GB resident).
-    The AudioClips themselves carry container paths under `assets/...` directly inside
-    `audio.bundle` (~1.7 GB resident, well within budget), so we use those paths as
-    identifiers. See conversation notes in the README.
+    Pairing rules per prefab stem `S`:
+    - **strict**: an AudioClip whose stem is exactly `S` wins.
+    - **loose**: otherwise, any AudioClip whose stem is `S-…` or `S_…` qualifies; we
+      pick the alphabetically-first as the chosen clip and surface the rest as
+      `extra_clips` in the index.
+    Carbon's `Components` field is unreliable for filtering audio (Unity built-ins
+    like AudioSource aren't listed), so we treat the whole prefab list as candidates
+    and let the name-pair gate decide what makes the final cut.
     """
     import UnityPy
     from types import SimpleNamespace
 
-    _log(f"scanning {bundles_dir} for {bundle_glob} …")
-    t0 = time.monotonic()
-    bundle_paths = sorted(p for p in bundles_dir.rglob(bundle_glob))
-    _log(f"found {len(bundle_paths)} bundles matching {bundle_glob} in {time.monotonic() - t0:.1f}s")
+    audio_bundle = bundles_dir / "shared" / "audio.bundle"
+    if not audio_bundle.is_file():
+        candidates = sorted(bundles_dir.rglob("audio*.bundle"))
+        if not candidates:
+            raise RustNotFoundError(
+                f"No audio*.bundle found under {bundles_dir}. "
+                "Cannot resolve AudioClips referenced by prefabs."
+            )
+        audio_bundle = candidates[0]
 
-    if not bundle_paths:
+    _log(f"audio bundle: {audio_bundle}")
+
+    rss_before = _rss_mb()
+    if rss_before > rss_abort_mb:
+        _log(f"ABORT: RSS {rss_before} MB exceeds --rss-abort-mb {rss_abort_mb}")
+        raise SystemExit(3)
+
+    t = time.monotonic()
+    _log(f"fetching prefab list (url={prefabs_url}, cache={prefabs_cache})")
+    try:
+        prefabs_data = fetch_prefabs(url=prefabs_url, cache_path=prefabs_cache)
+    except Exception as exc:
+        raise RustNotFoundError(
+            f"failed to fetch prefab list from {prefabs_url}: {exc}. "
+            "Provide --prefabs-cache pointing at a local JSON copy if offline."
+        ) from exc
+    paths = extract_prefab_paths(prefabs_data)
+    _log(f"prefab list: {len(paths)} unique paths in {time.monotonic() - t:.2f}s")
+    if not paths:
         return
 
-    sizes = sorted(
-        ((p.stat().st_size, p) for p in bundle_paths),
-        key=lambda t: -t[0],
-    )
-    _log("matched bundles (largest first):")
-    for size, p in sizes[:10]:
-        _log(f"  {size / (1024 * 1024):>8.1f} MB  {p.name}")
+    size_mb = audio_bundle.stat().st_size / (1024 * 1024)
+    _log(f"load  {audio_bundle.name}  size={size_mb:.1f} MB  RSS_before={_rss_mb()}")
+    t = time.monotonic()
+    try:
+        env = UnityPy.load(str(audio_bundle))
+    except Exception as exc:
+        raise RustNotFoundError(f"could not parse {audio_bundle.name}: {exc}") from exc
+    _log(f"loaded {audio_bundle.name} in {time.monotonic() - t:.2f}s  RSS_after_load={_rss_mb()}")
 
+    # Build {stem: [(clip_handle, container_path), ...]} by reading every AudioClip
+    # in audio.bundle once. Stems can collide across paths (e.g. two monuments with
+    # a clip called "door-open-01"); we keep all and sort by container later for
+    # deterministic tie-break.
+    clips_by_stem: dict[str, list[tuple[Any, str]]] = defaultdict(list)
+    for obj in env.objects:
+        if obj.type.name != "AudioClip":
+            continue
+        container = (obj.container or "").lower()
+        if not container.startswith("assets/"):
+            continue
+        stem = container.rsplit("/", 1)[-1].rsplit(".", 1)[0]
+        try:
+            clip = obj.read()
+        except Exception:
+            continue
+        clips_by_stem[stem].append((clip, container))
+    _log(f"indexed {sum(len(v) for v in clips_by_stem.values())} clips across {len(clips_by_stem)} unique stems  RSS={_rss_mb()}")
+
+    strict = loose = unmatched = 0
     try:
         from tqdm import tqdm
-        bundle_iter = tqdm(bundle_paths, desc="bundles", unit="bundle", file=sys.stderr)
+        prefab_iter = tqdm(paths, desc="prefabs", unit="prefab", file=sys.stderr)
     except ImportError:
-        bundle_iter = bundle_paths
+        prefab_iter = paths
 
-    for bundle_path in bundle_iter:
-        size_mb = bundle_path.stat().st_size / (1024 * 1024)
+    for prefab_path in prefab_iter:
+        prefab_stem = prefab_path.rsplit("/", 1)[-1].rsplit(".", 1)[0]
 
-        if max_bundle_mb is not None and size_mb > max_bundle_mb:
-            _log(f"SKIP oversized bundle {bundle_path.name} ({size_mb:.1f} MB > {max_bundle_mb} MB cap)")
-            continue
-
-        rss_before = _rss_mb()
-        if rss_before > rss_abort_mb:
-            _log(f"ABORT: RSS {rss_before} MB exceeds --rss-abort-mb {rss_abort_mb}")
-            raise SystemExit(3)
-
-        _log(f"load  {bundle_path.name}  size={size_mb:.1f} MB  RSS_before={rss_before}")
-        t_load = time.monotonic()
-        try:
-            env = UnityPy.load(str(bundle_path))
-        except Exception as exc:
-            print(f"[skip] could not parse bundle {bundle_path.name}: {exc}", file=sys.stderr, flush=True)
-            continue
-        load_s = time.monotonic() - t_load
-        _log(f"loaded {bundle_path.name}  in {load_s:.2f}s  RSS_after_load={_rss_mb()}")
-
-        # Cheap scan: collect AudioClip handles by type without .read()-ing them.
-        audio_clip_objs = [obj for obj in env.objects if obj.type.name == "AudioClip"]
-        _log(f"AudioClips in {bundle_path.name}: {len(audio_clip_objs)}  RSS={_rss_mb()}")
-
-        if not audio_clip_objs:
-            _log(f"no AudioClips in {bundle_path.name}, skipping")
-            del env, audio_clip_objs
-            gc.collect()
-            continue
-
-        yielded = 0
-        skipped_no_path = 0
-        for ac_obj in audio_clip_objs:
-            container = (ac_obj.container or "").lower()
-            if not container.startswith("assets/"):
-                skipped_no_path += 1
+        # Candidates: (priority, stem, clip, container). priority 0 = strict (stem
+        # equals prefab stem), 1 = loose (stem starts with prefab_stem + '-' or '_').
+        # Sort by (priority asc, stem asc, container asc) so strict beats loose and
+        # ties resolve deterministically.
+        candidates: list[tuple[int, str, Any, str]] = []
+        for clip, container in clips_by_stem.get(prefab_stem, []):
+            candidates.append((0, prefab_stem, clip, container))
+        for stem, entries in clips_by_stem.items():
+            if stem == prefab_stem:
                 continue
-            try:
-                clip = ac_obj.read()
-            except Exception:
-                continue
-            # UnityPy 1.20 stores the asset name under `m_Name` (Unity's native field).
-            # Fall back to the path leaf if that's missing.
-            clip_name = (
-                getattr(clip, "m_Name", None)
-                or getattr(clip, "name", None)
-                or container.rsplit("/", 1)[-1]
-            )
-            clip_ref = SimpleNamespace(name=clip_name, raw_handle=clip)
-            yielded += 1
-            yield SimpleNamespace(
-                container=container,
-                has_audio_source=True,
-                audio_clips=[clip_ref],
-                root_source_clip=clip_ref,
-            )
+            if stem.startswith(prefab_stem + "-") or stem.startswith(prefab_stem + "_"):
+                for clip, container in entries:
+                    candidates.append((1, stem, clip, container))
 
-        _log(
-            f"yielded {yielded} clips from {bundle_path.name} "
-            f"(skipped_no_assets_path={skipped_no_path})  RSS={_rss_mb()}"
+        if not candidates:
+            unmatched += 1
+            continue
+
+        candidates.sort(key=lambda t: (t[0], t[1], t[3]))
+        chosen_priority, chosen_name, chosen_clip, _ = candidates[0]
+        if chosen_priority == 0:
+            strict += 1
+        else:
+            loose += 1
+
+        # Extras: deduped stems excluding the chosen one. Multiple clips with the
+        # same stem (across different paths) collapse to one display name; the
+        # chosen's stem is omitted because it would just repeat the name field.
+        seen_stems = {chosen_name}
+        extra_names: list[str] = []
+        for _, stem, _, _ in candidates[1:]:
+            if stem in seen_stems:
+                continue
+            seen_stems.add(stem)
+            extra_names.append(stem)
+
+        chosen_ref = SimpleNamespace(name=chosen_name, raw_handle=chosen_clip)
+        # `extras` get name-only stand-ins (no raw_handle, never decoded). The pipeline's
+        # pick_audio_clip uses identity to pick `chosen_ref` and emits the others' names.
+        audio_clips = [chosen_ref] + [SimpleNamespace(name=n) for n in extra_names]
+        yield SimpleNamespace(
+            container=prefab_path,
+            has_audio_source=True,
+            audio_clips=audio_clips,
+            root_source_clip=chosen_ref,
         )
 
-        del env, audio_clip_objs
-        gc.collect()
+    _log(
+        f"prefab pairing: strict={strict} loose={loose} unmatched={unmatched} "
+        f"(of {len(paths)} prefabs)  RSS={_rss_mb()}"
+    )
+
+    del env, clips_by_stem
+    gc.collect()
 
 
 def _decode(clip_ref: Any) -> tuple[bytes, int]:
@@ -159,25 +198,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="Stop after N extracted prefabs (debug).")
     parser.add_argument("--strict", action="store_true", help="Abort on any extraction error.")
     parser.add_argument(
-        "--max-bundle-mb",
-        type=float,
-        default=None,
-        help="Skip bundles larger than this many MB (default: no cap).",
-    )
-    parser.add_argument(
         "--rss-abort-mb",
         type=int,
         default=4096,
         help="Abort if process RSS exceeds this many MB (default: 4096).",
     )
     parser.add_argument(
-        "--bundle-glob",
-        default="audio*.bundle",
-        help=(
-            "Which bundle filenames to load, as an rglob pattern (default: audio*.bundle). "
-            "Other Rust bundles contain no AudioClips and would just burn RAM. "
-            "Pass --bundle-glob '*.bundle' to scan everything."
-        ),
+        "--prefabs-url",
+        default=CARBON_PREFABS_URL,
+        help=f"URL to fetch the canonical prefab list from (default: {CARBON_PREFABS_URL}).",
+    )
+    parser.add_argument(
+        "--prefabs-cache",
+        type=Path,
+        default=None,
+        help="If provided and the file exists, read the prefab list from here instead of fetching.",
     )
     args = parser.parse_args(argv)
 
@@ -204,10 +239,10 @@ def main(argv: list[str] | None = None) -> int:
     _log(f"rust_dir={rust_dir}  bundles_dir={bundles_dir}")
 
     def walk(bd: Path):
-        return _walk_bundles_via_unitypy(
+        return _walk_via_prefab_list(
             bd,
-            bundle_glob=args.bundle_glob,
-            max_bundle_mb=args.max_bundle_mb,
+            prefabs_url=args.prefabs_url,
+            prefabs_cache=args.prefabs_cache,
             rss_abort_mb=args.rss_abort_mb,
         )
 
