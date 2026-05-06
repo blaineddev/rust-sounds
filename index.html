@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>rust-sounds</title>
+  <link rel="stylesheet" href="site.css" />
+</head>
+<body>
+  <header>
+    <h1>rust-sounds</h1>
+    <input id="search" type="search" placeholder="search prefab name…" autocomplete="off" />
+  </header>
+
+  <main>
+    <div id="status" class="status">loading…</div>
+    <section id="grid" class="grid" hidden></section>
+    <div id="sentinel" class="sentinel" aria-hidden="true"></div>
+  </main>
+
+  <audio id="player" preload="none"></audio>
+
+  <script type="module" src="site.js"></script>
+</body>
+</html>

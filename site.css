@@ -1,0 +1,115 @@
+:root {
+  color-scheme: dark;
+  --bg: #1b1b1b;
+  --bg-tile: #262626;
+  --bg-tile-active: #3a2f1f;
+  --border: #333;
+  --border-active: #cd7c2f;
+  --text: #e6e6e6;
+  --text-muted: #888;
+  --accent: #cd7c2f;
+  --flash: #2f5a2f;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0.02em;
+}
+
+#search {
+  flex: 1;
+  max-width: 480px;
+  padding: 8px 12px;
+  background: var(--bg-tile);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+main {
+  padding: 20px;
+}
+
+.status {
+  color: var(--text-muted);
+  padding: 40px 0;
+  text-align: center;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.tile {
+  background: var(--bg-tile);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 110px;
+  transition: background 600ms ease;
+}
+
+.tile.active {
+  border-color: var(--border-active);
+  background: var(--bg-tile-active);
+}
+
+.tile.flash {
+  background: var(--flash);
+  transition: background 0ms;
+}
+
+.tile .name { font-weight: 600; word-break: break-word; }
+.tile .category { color: var(--text-muted); font-size: 12px; word-break: break-word; }
+.tile .duration { color: var(--text-muted); font-size: 11px; }
+
+.tile .actions {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.tile button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 16px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tile button:hover { border-color: var(--accent); color: var(--accent); }
+.tile button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sentinel { height: 1px; }

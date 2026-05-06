@@ -1,0 +1,26 @@
+[
+  {
+    "prefab": "assets/prefabs/weapons/ak47/effects/fire.prefab",
+    "file": "fixtures/silence.mp3",
+    "name": "ak47 fire",
+    "category": "weapons/ak47/effects",
+    "duration_ms": 230,
+    "extra_clips": []
+  },
+  {
+    "prefab": "assets/prefabs/tools/torch/swing.prefab",
+    "file": "fixtures/silence.mp3",
+    "name": "torch swing",
+    "category": "tools/torch",
+    "duration_ms": 410,
+    "extra_clips": []
+  },
+  {
+    "prefab": "assets/prefabs/misc/halloween/scarecrow_groan.prefab",
+    "file": "fixtures/silence.mp3",
+    "name": "scarecrow groan",
+    "category": "misc/halloween",
+    "duration_ms": 1820,
+    "extra_clips": []
+  }
+]
