@@ -3,6 +3,8 @@
   --bg: #1b1b1b;
   --bg-tile: #262626;
   --bg-tile-active: #3a2f1f;
+  --bg-pill: #2a2a2a;
+  --bg-pill-active: #4a3220;
   --border: #333;
   --border-active: #cd7c2f;
   --text: #e6e6e6;
@@ -29,7 +31,7 @@ header {
   position: sticky;
   top: 0;
   background: var(--bg);
-  z-index: 1;
+  z-index: 2;
 }
 
 header h1 {
@@ -47,6 +49,73 @@ header h1 {
   border: 1px solid var(--border);
   border-radius: 4px;
   font-size: 14px;
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.volume-icon {
+  font-size: 16px;
+  user-select: none;
+}
+
+#volume {
+  width: 120px;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* Pills row */
+.pills {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 65px;
+  background: var(--bg);
+  z-index: 1;
+  scrollbar-width: thin;
+}
+
+.pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-pill);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pill:hover {
+  border-color: var(--accent);
+}
+
+.pill.active {
+  background: var(--bg-pill-active);
+  border-color: var(--border-active);
+  color: var(--accent);
+}
+
+.pill-count {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pill.active .pill-count {
+  color: var(--accent);
 }
 
 main {
@@ -107,9 +176,66 @@ main {
   padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .tile button:hover { border-color: var(--accent); color: var(--accent); }
 .tile button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.variant-badge {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  background: var(--border);
+  padding: 1px 5px;
+  border-radius: 8px;
+  letter-spacing: 0.02em;
+}
+
+.tile button:hover .variant-badge { color: var(--accent); }
+
+/* Hover tooltip for the copy button */
+.tooltip {
+  position: absolute;
+  max-width: 420px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 8px 12px;
+  background: var(--bg-tile);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  z-index: 10;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.tooltip-heading {
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.tooltip ul {
+  margin: 0;
+  padding: 0 0 0 14px;
+  list-style: disc;
+}
+
+.tooltip li {
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.tooltip-overflow {
+  color: var(--text-muted);
+  font-style: italic;
+  list-style: none;
+  margin-left: -14px;
+  padding-top: 4px;
+}
 
 .sentinel { height: 1px; }

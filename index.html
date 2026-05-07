@@ -10,7 +10,13 @@
   <header>
     <h1>rust-sounds</h1>
     <input id="search" type="search" placeholder="search prefab name…" autocomplete="off" />
+    <div class="volume">
+      <span class="volume-icon" aria-hidden="true">🔊</span>
+      <input id="volume" type="range" min="0" max="100" step="1" aria-label="Playback volume" />
+    </div>
   </header>
+
+  <nav id="pills" class="pills" aria-label="Filter by category"></nav>
 
   <main>
     <div id="status" class="status">loading…</div>
@@ -18,6 +24,7 @@
     <div id="sentinel" class="sentinel" aria-hidden="true"></div>
   </main>
 
+  <div id="tooltip" class="tooltip" hidden role="tooltip"></div>
   <audio id="player" preload="none"></audio>
 
   <script type="module" src="site.js"></script>

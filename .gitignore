@@ -1,9 +1,34 @@
+# Python
 __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
 .coverage
 *.egg-info/
+
+# OS / editor
 .DS_Store
+.vscode/
+.idea/
+.claude/
+
+# Logs
 *.log
-local_rust/
+
+# Scratch and intermediate extractor artifacts
+_spike_*
+_pass*.py
+_pass*_out.json
+_build/
+
+# Legacy outputs (replaced by data/sounds.json)
+/index.json
+
+# Local development scratch — not used by the extractor; safe to recreate
+/local_rust/
+
+# Planning / design documents stay local; they are not deliverables.
+/docs/
+
+# PrefabSniffer dumps used during development bootstrap
+/prefabsniffer_*.txt

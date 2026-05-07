@@ -1,0 +1,47 @@
+{
+  "clips": {
+    "fixture00aaa1": { "path": "fixtures/silence.mp3", "duration": 0.2 },
+    "fixture00aaa2": { "path": "fixtures/silence.mp3", "duration": 0.2 },
+    "fixture00aaa3": { "path": "fixtures/silence.mp3", "duration": 0.2 },
+    "fixture00aaa4": { "path": "fixtures/silence.mp3", "duration": 0.2 },
+    "fixture00bbbb": { "path": "fixtures/silence.mp3", "duration": 0.4 },
+    "fixture00cccc": { "path": "fixtures/silence.mp3", "duration": 1.1 }
+  },
+  "prefabs": [
+    {
+      "path": "assets/prefabs/weapons/ak47/effects/fire.prefab",
+      "name": "fire",
+      "categories": ["weapons", "ak47"],
+      "clips": ["fixture00aaa1", "fixture00aaa2", "fixture00aaa3"],
+      "confidence": "reference"
+    },
+    {
+      "path": "assets/prefabs/weapons/ak47/effects/fire_silenced.prefab",
+      "name": "fire_silenced",
+      "categories": ["weapons", "ak47"],
+      "clips": ["fixture00aaa4"],
+      "confidence": "reference"
+    },
+    {
+      "path": "assets/prefabs/building/door.hinged/effects/door-metal-open-end.prefab",
+      "name": "door-metal-open-end",
+      "categories": ["building", "door.hinged"],
+      "clips": ["fixture00bbbb"],
+      "confidence": "reference"
+    },
+    {
+      "path": "assets/prefabs/building/door.hinged/effects/vault-metal-open-end.prefab",
+      "name": "vault-metal-open-end",
+      "categories": ["building", "door.hinged"],
+      "clips": ["fixture00bbbb"],
+      "confidence": "reference"
+    },
+    {
+      "path": "assets/bundled/prefabs/fx/impacts/blunt/wood/wood1.prefab",
+      "name": "wood1",
+      "categories": ["impacts", "blunt", "wood"],
+      "clips": ["fixture00cccc"],
+      "confidence": "reference"
+    }
+  ]
+}

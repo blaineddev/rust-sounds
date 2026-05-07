@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from rust_sounds.locator import RustNotFoundError, find_bundles_dir, find_rust_install
+from src.locator import RustNotFoundError, find_bundles_dir, find_rust_install
 
 
 class TestFindRustInstall:
@@ -20,13 +20,13 @@ class TestFindRustInstall:
         (fake_steam / "Bundles").mkdir(parents=True)
 
         monkeypatch.setattr(
-            "rust_sounds.locator._STEAM_CANDIDATES",
+            "src.locator._STEAM_CANDIDATES",
             [fake_steam],
         )
         assert find_rust_install() == fake_steam
 
     def test_raises_with_helpful_message_when_not_found(self, monkeypatch):
-        monkeypatch.setattr("rust_sounds.locator._STEAM_CANDIDATES", [])
+        monkeypatch.setattr("src.locator._STEAM_CANDIDATES", [])
         with pytest.raises(RustNotFoundError, match="--rust-dir"):
             find_rust_install()
 

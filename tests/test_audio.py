@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from rust_sounds.audio import TranscodeError, transcode_wav_to_mp3
+from src.audio import TranscodeError, transcode_wav_to_mp3
 
 ffmpeg_missing = shutil.which("ffmpeg") is None
 pytestmark = pytest.mark.skipif(ffmpeg_missing, reason="ffmpeg not on PATH")
